@@ -1,14 +1,16 @@
+// @ts-check
 // Your Spotify API credentials
-const clientId = "";
-const clientSecret = "";
+const CLIENT_ID = "dde73a7937494965912a433459ec1e60";
+const CLIENT_SECRET = "";
 const RELEASE_RADAR_PLAYLIST_ID = "37i9dQZEVXbvUwdkZRQfTG";
+const USER_ID = "121426078";
 
 // Get an access token using the Client Credentials Flow
 async function getAccessToken() {
   const response = await fetch("https://accounts.spotify.com/api/token", {
     method: "POST",
     headers: {
-      Authorization: `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
+      Authorization: `Basic ${btoa(`${CLIENT_ID}:${CLIENT_SECRET}`)}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: "grant_type=client_credentials",
@@ -22,6 +24,11 @@ async function getAccessToken() {
 async function getReleaseRadarTracks(accessToken) {
   // THIS IS UGLY
   let data = [];
+  let firstData = {};
+  let secondData = {};
+  let thirdData = {};
+
+  // Fetch first 100 tracks
   const first = await fetch(
     `https://api.spotify.com/v1/playlists/${RELEASE_RADAR_PLAYLIST_ID}/tracks?offset=0&limit=100`,
     {
@@ -30,8 +37,10 @@ async function getReleaseRadarTracks(accessToken) {
       },
     }
   );
-  const firstData = await first.json();
+  firstData = await first.json();
   data = [...firstData.items.map((item) => item.track)];
+
+  // Fetch next 100 tracks if any exist
   if (firstData.next) {
     const second = await fetch(
       `https://api.spotify.com/v1/playlists/${RELEASE_RADAR_PLAYLIST_ID}/tracks?offset=100&limit=100&locale=US`,
@@ -41,23 +50,24 @@ async function getReleaseRadarTracks(accessToken) {
         },
       }
     );
-    const secondData = await second.json();
+    secondData = await second.json();
     data = [...data, ...secondData.items.map((item) => item.track)];
-    if (secondData.next) {
-      const third = await fetch(
-        `https://api.spotify.com/v1/playlists/${RELEASE_RADAR_PLAYLIST_ID}/tracks?offset=200&limit=100`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      );
-      const thirdData = await third.json();
-      data = [...data, ...thirdData.items.map((item) => item.track)];
-    }
   }
 
-  console.log(data);
+  // Fetch next 100 tracks if any exists
+  if (secondData.next) {
+    const third = await fetch(
+      `https://api.spotify.com/v1/playlists/${RELEASE_RADAR_PLAYLIST_ID}/tracks?offset=200&limit=100`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+    thirdData = await third.json();
+    data = [...data, ...thirdData.items.map((item) => item.track)];
+  }
+
   return data;
 }
 
@@ -91,7 +101,6 @@ async function createPlaylist(accessToken, userId, playlistName, trackUris) {
   );
 
   const playlistData = await createPlaylistResponse.json();
-  console.log(playlistData);
   const playlistId = playlistData.id;
 
   const response = await fetch(
@@ -109,12 +118,23 @@ async function createPlaylist(accessToken, userId, playlistName, trackUris) {
   );
 
   const data = await response.json();
-  console.log("PLAYLIST CREATED");
-  console.log(data);
 
   //   console.log(
   // `Playlist "${playlistName}" created with ${trackUris.length} tracks.`
   //   );
+}
+
+function formatDate(inputDate) {
+  // Parse the input date string
+  const dateParts = inputDate.split("-");
+  const year = parseInt(dateParts[0], 10);
+  const month = parseInt(dateParts[1], 10);
+  const day = parseInt(dateParts[2], 10);
+
+  // Format the date as MM/DD
+  const formattedDate = `${month}/${day}`;
+
+  return formattedDate;
 }
 
 (async () => {
@@ -124,26 +144,31 @@ async function createPlaylist(accessToken, userId, playlistName, trackUris) {
       throw new Error("No token found");
     }
     const tracks = await getReleaseRadarTracks(accessToken);
-    // console.log({ tracks: tracks.length });
-    // return;
-    const userId = "121426078"; // Replace with your user ID
     const playlistsToCreate = [];
+    const releaseRadarTrackUris = tracks.map((track) => track.uri);
+    playlistsToCreate.push({
+      name: "API Radar",
+      trackUris: releaseRadarTrackUris,
+    });
 
     for (const track of tracks) {
       const albumDetails = await getAlbumDetails(accessToken, track.album.id);
 
-      if (albumDetails.total_tracks > 10) {
+      if (albumDetails.total_tracks > 1) {
         const trackUris = albumDetails.tracks.items.map((item) => item.uri);
-        const playlistName = `${albumDetails.name} Playlist`;
+        const playlistName = `${formatDate(albumDetails.release_date)} - ${
+          albumDetails.name
+        } (${albumDetails.total_tracks})`;
 
         playlistsToCreate.push({ name: playlistName, trackUris });
       }
     }
-
+    console.log(playlistsToCreate.map((p) => p.name));
+    return;
     for (const playlist of playlistsToCreate) {
       await createPlaylist(
         accessToken,
-        userId,
+        USER_ID,
         playlist.name,
         playlist.trackUris
       );
