@@ -29,41 +29,32 @@ async function getReleaseRadarTracks(accessToken) {
   let thirdData = {};
 
   // Fetch first 100 tracks
-  const first = await fetch(
-    `https://api.spotify.com/v1/playlists/${RELEASE_RADAR_PLAYLIST_ID}/tracks?offset=0&limit=100`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
-  );
+  const first = await fetch(`https://api.spotify.com/v1/playlists/${RELEASE_RADAR_PLAYLIST_ID}/tracks?offset=0&limit=100`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
   firstData = await first.json();
   data = [...firstData.items.map((item) => item.track)];
 
   // Fetch next 100 tracks if any exist
   if (firstData.next) {
-    const second = await fetch(
-      `https://api.spotify.com/v1/playlists/${RELEASE_RADAR_PLAYLIST_ID}/tracks?offset=100&limit=100&locale=US`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
+    const second = await fetch(`https://api.spotify.com/v1/playlists/${RELEASE_RADAR_PLAYLIST_ID}/tracks?offset=100&limit=100&locale=US`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
     secondData = await second.json();
     data = [...data, ...secondData.items.map((item) => item.track)];
   }
 
   // Fetch next 100 tracks if any exists
   if (secondData.next) {
-    const third = await fetch(
-      `https://api.spotify.com/v1/playlists/${RELEASE_RADAR_PLAYLIST_ID}/tracks?offset=200&limit=100`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
+    const third = await fetch(`https://api.spotify.com/v1/playlists/${RELEASE_RADAR_PLAYLIST_ID}/tracks?offset=200&limit=100`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
     thirdData = await third.json();
     data = [...data, ...thirdData.items.map((item) => item.track)];
   }
@@ -85,37 +76,31 @@ async function getAlbumDetails(accessToken, albumId) {
 
 // Create a new playlist and add tracks to it
 async function createPlaylist(accessToken, userId, playlistName, trackUris) {
-  const createPlaylistResponse = await fetch(
-    `https://api.spotify.com/v1/users/${userId}/playlists`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name: playlistName,
-        public: false,
-      }),
-    }
-  );
+  const createPlaylistResponse = await fetch(`https://api.spotify.com/v1/users/${userId}/playlists`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      name: playlistName,
+      public: false,
+    }),
+  });
 
   const playlistData = await createPlaylistResponse.json();
   const playlistId = playlistData.id;
 
-  const response = await fetch(
-    `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        uris: trackUris,
-      }),
-    }
-  );
+  const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      uris: trackUris,
+    }),
+  });
 
   const data = await response.json();
 
@@ -156,9 +141,7 @@ function formatDate(inputDate) {
 
       if (albumDetails.total_tracks > 1) {
         const trackUris = albumDetails.tracks.items.map((item) => item.uri);
-        const playlistName = `${formatDate(albumDetails.release_date)} - ${
-          albumDetails.name
-        } (${albumDetails.total_tracks})`;
+        const playlistName = `${formatDate(albumDetails.release_date)} - ${albumDetails.name} (${albumDetails.total_tracks})`;
 
         playlistsToCreate.push({ name: playlistName, trackUris });
       }
@@ -166,12 +149,7 @@ function formatDate(inputDate) {
     console.log(playlistsToCreate.map((p) => p.name));
     return;
     for (const playlist of playlistsToCreate) {
-      await createPlaylist(
-        accessToken,
-        USER_ID,
-        playlist.name,
-        playlist.trackUris
-      );
+      await createPlaylist(accessToken, USER_ID, playlist.name, playlist.trackUris);
     }
   } catch (error) {
     console.error("Error:", error.message);
