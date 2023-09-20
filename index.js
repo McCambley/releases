@@ -1,22 +1,24 @@
 // @ts-check
+const jwt = require("jsonwebtoken"); // You might need to install this package
 // Your Spotify API credentials
-const CLIENT_ID = "dde73a7937494965912a433459ec1e60";
-const CLIENT_SECRET = "";
-const RELEASE_RADAR_PLAYLIST_ID = "37i9dQZEVXbvUwdkZRQfTG";
-const USER_ID = "121426078";
+const CLIENT_ID = process.env.CLIENT_ID;
+const CLIENT_SECRET = process.env.CLIENT_SECRET;
+const RELEASE_RADAR_PLAYLIST_ID = process.env.RELEASE_RADAR_PLAYLIST_ID;
+const USER_ID = process.env.USER_ID;
 
 // Get an access token using the Client Credentials Flow
 async function getAccessToken() {
   const response = await fetch("https://accounts.spotify.com/api/token", {
     method: "POST",
     headers: {
-      Authorization: `Basic ${btoa(`${CLIENT_ID}:${CLIENT_SECRET}`)}`,
+      Authorization: `Basic ${Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString("base64")}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: "grant_type=client_credentials",
   });
 
   const data = await response.json();
+
   return data.access_token;
 }
 
@@ -91,22 +93,49 @@ async function createPlaylist(accessToken, userId, playlistName, trackUris) {
   const playlistData = await createPlaylistResponse.json();
   const playlistId = playlistData.id;
 
-  const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      uris: trackUris,
-    }),
-  });
+  await asyncPause();
 
-  const data = await response.json();
+  async function addSong(uri) {
+    try {
+      const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          uris: [uri],
+        }),
+      });
 
-  //   console.log(
-  // `Playlist "${playlistName}" created with ${trackUris.length} tracks.`
-  //   );
+      if (!response.ok) {
+        // Handle error cases
+        const errorData = await response.json();
+        throw new Error(`Error adding songs: ${errorData.error.message}`);
+      }
+      return response.json(); // Return the response data
+    } catch (error) {
+      console.error("An error occurred while adding songs:", error);
+
+      throw error;
+    }
+  }
+
+  let responses = [];
+  for (const uri of trackUris) {
+    const data = await addSong(uri);
+    responses.push(data);
+  }
+
+  return responses;
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function asyncPause() {
+  await delay(2000); // Pause for 10 seconds asynchronously
 }
 
 function formatDate(inputDate) {
@@ -122,9 +151,8 @@ function formatDate(inputDate) {
   return formattedDate;
 }
 
-(async () => {
+async function automatePlaylistCreation(accessToken) {
   try {
-    const accessToken = await getAccessToken();
     if (!accessToken) {
       throw new Error("No token found");
     }
@@ -141,17 +169,20 @@ function formatDate(inputDate) {
 
       if (albumDetails.total_tracks > 1) {
         const trackUris = albumDetails.tracks.items.map((item) => item.uri);
-        const playlistName = `${formatDate(albumDetails.release_date)} - ${albumDetails.name} (${albumDetails.total_tracks})`;
+        const playlistName = `${albumDetails.artists[0].name} - ${albumDetails.name} (${formatDate(albumDetails.release_date)}) (${albumDetails.total_tracks})`;
 
         playlistsToCreate.push({ name: playlistName, trackUris });
       }
     }
-    console.log(playlistsToCreate.map((p) => p.name));
-    return;
     for (const playlist of playlistsToCreate) {
       await createPlaylist(accessToken, USER_ID, playlist.name, playlist.trackUris);
     }
+    console.log("Success!!");
+    return { status: 200, message: "Success!", data: playlistsToCreate };
   } catch (error) {
     console.error("Error:", error.message);
+    throw error;
   }
-})();
+}
+
+module.exports = { automatePlaylistCreation };
