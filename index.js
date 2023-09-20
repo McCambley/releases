@@ -169,13 +169,14 @@ async function automatePlaylistCreation(accessToken) {
 
       if (albumDetails.total_tracks > 1) {
         const trackUris = albumDetails.tracks.items.map((item) => item.uri);
-        const playlistName = `${albumDetails.artists[0].name} - ${albumDetails.name} (${formatDate(albumDetails.release_date)}) (${albumDetails.total_tracks})`;
+        const playlistName = `${formatDate(albumDetails.release_date)} | ${albumDetails.total_tracks} | ${albumDetails.artists[0].name} - ${albumDetails.name}`;
 
         playlistsToCreate.push({ name: playlistName, trackUris });
       }
     }
     for (const playlist of playlistsToCreate) {
       await createPlaylist(accessToken, USER_ID, playlist.name, playlist.trackUris);
+      console.log(`${playlist.name} created!`);
     }
     console.log("Success!!");
     return { status: 200, message: "Success!", data: playlistsToCreate };
