@@ -92,6 +92,7 @@ async function createPlaylist(accessToken, userId, playlistName, trackUris) {
 
   const playlistData = await createPlaylistResponse.json();
   const playlistId = playlistData.id;
+  // console.log("Created Playlist: ", playlistData.name);
 
   await asyncPause();
 
@@ -113,6 +114,7 @@ async function createPlaylist(accessToken, userId, playlistName, trackUris) {
         const errorData = await response.json();
         throw new Error(`Error adding songs: ${errorData.error.message}`);
       }
+      // console.log("Added Song: ", uri);
       return response.json(); // Return the response data
     } catch (error) {
       console.error("An error occurred while adding songs:", error);
@@ -159,21 +161,40 @@ async function automatePlaylistCreation(accessToken) {
     const tracks = await getReleaseRadarTracks(accessToken);
     const playlistsToCreate = [];
     const releaseRadarTrackUris = tracks.map((track) => track.uri);
+    let releaseRadarTrimmedTrackUris = [];
+
+    // Get 7 days ago
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+
+    for (const track of tracks) {
+      const albumDetails = await getAlbumDetails(accessToken, track.album.id);
+      const releaseDate = new Date(albumDetails.release_date);
+      const isRecent = releaseDate >= sevenDaysAgo;
+
+      if (albumDetails.total_tracks > 3 && isRecent) {
+        const trackUris = albumDetails.tracks.items.map((item) => item.uri);
+        const playlistName = `${formatDate(albumDetails.release_date)} | ${albumDetails.total_tracks} | ${albumDetails.artists[0].name} - ${albumDetails.name}`;
+        // console.log("Making: ", playlistName);
+        playlistsToCreate.push({ name: playlistName, trackUris });
+      } else {
+        releaseRadarTrimmedTrackUris.push(track.uri);
+      }
+    }
+
+    playlistsToCreate.sort();
+    playlistsToCreate.push({
+      name: "API Radar (Trimmed)",
+      trackUris: releaseRadarTrimmedTrackUris,
+    });
+
     playlistsToCreate.push({
       name: "API Radar",
       trackUris: releaseRadarTrackUris,
     });
 
-    for (const track of tracks) {
-      const albumDetails = await getAlbumDetails(accessToken, track.album.id);
+    // console.log(playlistsToCreate);
 
-      if (albumDetails.total_tracks > 1) {
-        const trackUris = albumDetails.tracks.items.map((item) => item.uri);
-        const playlistName = `${formatDate(albumDetails.release_date)} | ${albumDetails.total_tracks} | ${albumDetails.artists[0].name} - ${albumDetails.name}`;
-
-        playlistsToCreate.push({ name: playlistName, trackUris });
-      }
-    }
     for (const playlist of playlistsToCreate) {
       await createPlaylist(accessToken, USER_ID, playlist.name, playlist.trackUris);
       console.log(`${playlist.name} created!`);
