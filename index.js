@@ -1,5 +1,13 @@
 // @ts-check
 const jwt = require("jsonwebtoken"); // You might need to install this package
+const chalk = require("chalk");
+
+const redBold = chalk.bold.red;
+const successBold = chalk.bold.green;
+const yellowBold = chalk.bold.yellow;
+const blueBold = chalk.bold.blue;
+const cyanBold = chalk.bold.cyan;
+
 // Your Spotify API credentials
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
@@ -114,7 +122,7 @@ async function createPlaylist(accessToken, userId, playlistName, trackUris) {
         const errorData = await response.json();
         throw new Error(`Error adding songs: ${errorData.error.message}`);
       }
-      // console.log("Added Song: ", uri);
+      console.log(blueBold("Added Song: ", uri));
       return response.json(); // Return the response data
     } catch (error) {
       console.error("An error occurred while adding songs:", error);
@@ -176,9 +184,15 @@ async function automatePlaylistCreation(accessToken) {
         const trackUris = albumDetails.tracks.items.map((item) => item.uri);
         const playlistName = `${formatDate(albumDetails.release_date)} | ${albumDetails.total_tracks} | ${albumDetails.artists[0].name} - ${albumDetails.name}`;
         // console.log("Making: ", playlistName);
+        console.log(successBold("Song made it's own playlist: ", track.name));
         playlistsToCreate.push({ name: playlistName, trackUris });
-      } else {
+      }
+
+      if (isRecent) {
+        console.log(yellowBold("Song made the trimmed playlist: ", track.name));
         releaseRadarTrimmedTrackUris.push(track.uri);
+      } else {
+        console.log(redBold("Song didn't make this weeks cut: ", track.name));
       }
     }
 
@@ -197,9 +211,9 @@ async function automatePlaylistCreation(accessToken) {
 
     for (const playlist of playlistsToCreate) {
       await createPlaylist(accessToken, USER_ID, playlist.name, playlist.trackUris);
-      console.log(`${playlist.name} created!`);
+      console.log(blueBold(`${playlist.name} created!`));
     }
-    console.log("Success!!");
+    console.log(cyanBold("Success!!"));
     return { status: 200, message: "Success!", data: playlistsToCreate };
   } catch (error) {
     console.error("Error:", error.message);
