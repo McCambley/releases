@@ -211,7 +211,7 @@ async function automatePlaylistCreation(accessToken) {
 
     for (const playlist of playlistsToCreate) {
       await createPlaylist(accessToken, USER_ID, playlist.name, playlist.trackUris);
-      console.log(blueBold(`${playlist.name} created!`));
+      console.log(successBold(`${playlist.name} created!`));
     }
     console.log(cyanBold("Success!!"));
     return { status: 200, message: "Success!", data: playlistsToCreate };
