@@ -192,7 +192,7 @@ async function automatePlaylistCreation(accessToken) {
         console.log(yellowBold("Song made the trimmed playlist: ", track.name));
         releaseRadarTrimmedTrackUris.push(track.uri);
       } else {
-        console.log(redBold("Song didn't make this weeks cut: ", track.name));
+        console.log(redBold(`Song didn't make this weeks cut (${releaseDate}): `, track.name));
       }
     }
 
