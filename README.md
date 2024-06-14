@@ -1,6 +1,6 @@
 # releases
 
-Checks one's Release Radar for new releases and creates playlists for each one
+Optimize how you listen to new music. `releases` checks one's Release Radar for new releases and creates playlists for each one, then trims this weeks Release Radar to only the newest music. 
 
 # Overview
 
