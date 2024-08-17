@@ -8,6 +8,15 @@ const yellowBold = chalk.bold.yellow;
 const blueBold = chalk.bold.blue;
 const cyanBold = chalk.bold.cyan;
 
+// Number of days to look back for new releases
+const DAYS = 6; // Friday
+// const DAYS = 7; // Saturday
+// const DAYS = 8; // Sunday
+// const DAYS = 9; // Monday
+// const DAYS = 10; // Tuesday
+
+const TRACK_MINIMUM = 1;
+
 // Your Spotify API credentials
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
@@ -173,23 +182,23 @@ async function automatePlaylistCreation(accessToken) {
 
     // Get 7 days ago
     const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - DAYS);
 
     for (const track of tracks) {
       const albumDetails = await getAlbumDetails(accessToken, track.album.id);
       const releaseDate = new Date(albumDetails.release_date);
       const isRecent = releaseDate >= sevenDaysAgo;
 
-      if (albumDetails.total_tracks > 3 && isRecent) {
+      if (albumDetails.total_tracks > TRACK_MINIMUM && isRecent) {
         const trackUris = albumDetails.tracks.items.map((item) => item.uri);
         const playlistName = `${formatDate(albumDetails.release_date)} | ${albumDetails.total_tracks} | ${albumDetails.artists[0].name} - ${albumDetails.name}`;
         // console.log("Making: ", playlistName);
-        console.log(successBold("Song made it's own playlist: ", track.name));
+        console.log(successBold(`Song "${track.name}" made it's own playlist: `, playlistName));
         playlistsToCreate.push({ name: playlistName, trackUris });
       }
 
       if (isRecent) {
-        console.log(yellowBold("Song made the trimmed playlist: ", track.name));
+        console.log(yellowBold(`Song made this weeks cut (${releaseDate}): `, track.name));
         releaseRadarTrimmedTrackUris.push(track.uri);
       } else {
         console.log(redBold(`Song didn't make this weeks cut (${releaseDate}): `, track.name));
