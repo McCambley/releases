@@ -59,7 +59,7 @@ app.get("/callback", async (req, res) => {
     const accessToken = await getAccessTokenFromRefreshToken(CLIENT_ID, CLIENT_SECRET, refreshToken);
     const responseV2 = await getNewMusic(accessToken);
     // OLD
-    // const response = await automatePlaylistCreation(accessToken);
+    const response = await automatePlaylistCreation(accessToken);
 
     // Store the refresh token securely for future use.
     // This refresh token can be used to obtain access tokens without the need for user interaction.
