@@ -1,16 +1,17 @@
+// ts-check
 const express = require("express");
 const querystring = require("querystring");
 
 require("dotenv").config();
 
-const { automatePlaylistCreation } = require("./index");
+const { automatePlaylistCreation, fetchFollowedArtists, getNewMusic } = require("./index");
 
 const app = express();
 
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const REDIRECT_URI = process.env.REDIRECT_URI;
-const scopes = ["playlist-modify-public", "playlist-modify-private"];
+const scopes = ["playlist-modify-public", "playlist-modify-private", "user-follow-read"];
 
 async function getAccessTokenFromRefreshToken(clientId, clientSecret, refreshToken) {
   const data = {
@@ -50,17 +51,25 @@ app.get("/login", (req, res) => {
 });
 
 app.get("/callback", async (req, res) => {
-  const code = req.query.code;
+  try {
+    const code = req.query.code;
 
-  const tokenData = await getAccessToken(code);
-  const refreshToken = tokenData.refresh_token;
-  const accessToken = await getAccessTokenFromRefreshToken(CLIENT_ID, CLIENT_SECRET, refreshToken);
-  const response = await automatePlaylistCreation(accessToken);
+    const tokenData = await getAccessToken(code);
+    const refreshToken = tokenData.refresh_token;
+    const accessToken = await getAccessTokenFromRefreshToken(CLIENT_ID, CLIENT_SECRET, refreshToken);
+    const responseV2 = await getNewMusic(accessToken);
+    // OLD
+    // const response = await automatePlaylistCreation(accessToken);
 
-  // Store the refresh token securely for future use.
-  // This refresh token can be used to obtain access tokens without the need for user interaction.
+    // Store the refresh token securely for future use.
+    // This refresh token can be used to obtain access tokens without the need for user interaction.
 
-  res.send(response);
+    res.send(responseV2);
+  } catch (error) {
+    console.error(error);
+    // res.redirect("/login");
+    res.status(500).send("An error occurred.");
+  }
 });
 
 async function getAccessToken(code) {

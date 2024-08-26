@@ -1,4 +1,3 @@
-// @ts-check
 const jwt = require("jsonwebtoken"); // You might need to install this package
 const chalk = require("chalk");
 
@@ -7,6 +6,8 @@ const successBold = chalk.bold.green;
 const yellowBold = chalk.bold.yellow;
 const blueBold = chalk.bold.blue;
 const cyanBold = chalk.bold.cyan;
+
+const PLAYLIST_NAME = "Mega Release Radar";
 
 // Number of days to look back for new releases
 const DAYS = 6; // Friday
@@ -111,7 +112,7 @@ async function createPlaylist(accessToken, userId, playlistName, trackUris) {
   const playlistId = playlistData.id;
   // console.log("Created Playlist: ", playlistData.name);
 
-  await asyncPause();
+  await delay(100);
 
   async function addSong(uri) {
     try {
@@ -170,6 +171,10 @@ function formatDate(inputDate) {
   return formattedDate;
 }
 
+function createAlbumName(albumDetails) {
+  return `${formatDate(albumDetails.release_date)} | ${albumDetails.total_tracks} | ${albumDetails.artists[0].name} - ${albumDetails.name}`;
+}
+
 async function automatePlaylistCreation(accessToken) {
   try {
     if (!accessToken) {
@@ -191,7 +196,7 @@ async function automatePlaylistCreation(accessToken) {
 
       if (albumDetails.total_tracks > TRACK_MINIMUM && isRecent) {
         const trackUris = albumDetails.tracks.items.map((item) => item.uri);
-        const playlistName = `${formatDate(albumDetails.release_date)} | ${albumDetails.total_tracks} | ${albumDetails.artists[0].name} - ${albumDetails.name}`;
+        const playlistName = createAlbumName(albumDetails);
         // console.log("Making: ", playlistName);
         console.log(successBold(`Song "${track.name}" made it's own playlist: `, playlistName));
         playlistsToCreate.push({ name: playlistName, trackUris });
@@ -230,4 +235,125 @@ async function automatePlaylistCreation(accessToken) {
   }
 }
 
-module.exports = { automatePlaylistCreation };
+async function fetchFollowedArtists(accessToken) {
+  let followedArtists = [];
+  let fetchMore = true;
+
+  async function fetchFollowedArtistsInner(url) {
+    const response = await fetch(url || `https://api.spotify.com/v1/me/following?type=artist&limit=50`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+    const data = await response.json();
+    console.log("data", data);
+    followedArtists = [...followedArtists, ...data.artists.items];
+    if (data.artists.next) {
+      await fetchFollowedArtistsInner(data.artists.next);
+    } else {
+      fetchMore = false;
+    }
+  }
+
+  do {
+    try {
+      await fetchFollowedArtistsInner();
+    } catch (error) {
+      console.log(error);
+      fetchMore = false;
+    }
+    await delay(50);
+  } while (fetchMore);
+
+  return followedArtists;
+}
+async function fetchRecentArtistReleases(accessToken, id) {
+  let artistReleases = [];
+  let fetchMore = true;
+
+  async function fetchRecentArtistReleasesInner(accessToken, id, url) {
+    const response = await fetch(url || `https://api.spotify.com/v1/artists/${id}/albums`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+    // console.log(response);
+    if (!response.ok) {
+      console.log("response", response);
+      throw new Error(response.statusText);
+    }
+    const data = await response.json();
+    // console.log("data", data);
+    artistReleases = [...artistReleases, ...data.items];
+    if (data.next) {
+      await fetchRecentArtistReleasesInner(accessToken, id, data.next);
+    } else {
+      fetchMore = false;
+    }
+  }
+
+  do {
+    try {
+      await fetchRecentArtistReleasesInner(accessToken, id);
+    } catch (error) {
+      console.log(error);
+      fetchMore = false;
+    }
+    await delay(100);
+  } while (fetchMore);
+
+  // Get 7 days ago
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - DAYS);
+
+  const recentReleases = artistReleases.filter((release) => new Date(release.release_date) >= sevenDaysAgo);
+
+  return recentReleases;
+}
+
+async function getNewMusic(accessToken) {
+  /**
+   * @type {Object.<string, string[]>}
+   */
+  const megaReleaseRadar = {
+    PLAYLIST_NAME: [],
+  };
+  // Get followed artists
+  let followedArtists = await fetchFollowedArtists(accessToken);
+
+  // Iterate over artists
+  let allRecentReleases = [];
+  for (const artist of followedArtists) {
+    const artistReleases = await fetchRecentArtistReleases(accessToken, artist.id);
+    // console.log(`${artist.name} has ${artistReleases.length} releases`);
+    // console.log(artistReleases.map((release) => release.release_date));
+    allRecentReleases = [...allRecentReleases, ...artistReleases];
+    await delay(100);
+  }
+
+  for (const recentRelease of allRecentReleases) {
+    // Get album details
+    const releaseDetails = await getAlbumDetails(accessToken, recentRelease.id);
+    const uris = releaseDetails.tracks.items.map((i) => i.uri);
+    // Check if the album has fewer than 4 tracks
+    if (releaseDetails.tracks.total < 4) {
+      // Add all tracks to the Mega Release Radar
+      megaReleaseRadar[PLAYLIST_NAME] = [...megaReleaseRadar[PLAYLIST_NAME], ...uris];
+    } else {
+      const albumName = createAlbumName(releaseDetails);
+      megaReleaseRadar[albumName] = uris;
+    }
+    await delay(100);
+  }
+
+  // Create playlist for each album
+  for (const [playlistName, trackUris] of Object.entries(megaReleaseRadar)) {
+    await createPlaylist(accessToken, USER_ID, playlistName, trackUris);
+    console.log(successBold(`${playlistName} created!`));
+    await delay(100);
+  }
+
+  return megaReleaseRadar;
+}
+
+module.exports = { automatePlaylistCreation, fetchFollowedArtists, fetchArtistReleases: fetchRecentArtistReleases, getNewMusic };
