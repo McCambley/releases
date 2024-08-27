@@ -16,7 +16,8 @@ const DAYS = 6; // Friday
 // const DAYS = 9; // Monday
 // const DAYS = 10; // Tuesday
 
-const TRACK_MINIMUM = 1;
+const TRACK_MINIMUM = 3;
+const EP_MAXIMUM = 4;
 
 // Your Spotify API credentials
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -349,7 +350,7 @@ async function getNewMusic(accessToken) {
     const releaseDetails = await getAlbumDetails(accessToken, recentRelease.id);
     const uris = releaseDetails.tracks.items.map((i) => i.uri);
     // Check if the album has fewer than 4 tracks
-    if (releaseDetails.tracks.total < 4) {
+    if (releaseDetails.tracks.total < EP_MAXIMUM) {
       // Add all tracks to the Mega Release Radar
       megaReleaseRadar[PLAYLIST_NAME] = [...megaReleaseRadar[PLAYLIST_NAME], ...uris];
     } else {
