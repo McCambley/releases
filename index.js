@@ -24,6 +24,14 @@ const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const RELEASE_RADAR_PLAYLIST_ID = process.env.RELEASE_RADAR_PLAYLIST_ID;
 const USER_ID = process.env.USER_ID;
 
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function asyncPause(ms = 200) {
+  await delay(ms); // Pause for .2 seconds asynchronously
+}
+
 // Get an access token using the Client Credentials Flow
 async function getAccessToken() {
   const response = await fetch("https://accounts.spotify.com/api/token", {
@@ -112,8 +120,6 @@ async function createPlaylist(accessToken, userId, playlistName, trackUris) {
   const playlistId = playlistData.id;
   // console.log("Created Playlist: ", playlistData.name);
 
-  await delay(100);
-
   async function addSong(uri) {
     try {
       const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
@@ -145,17 +151,10 @@ async function createPlaylist(accessToken, userId, playlistName, trackUris) {
   for (const uri of trackUris) {
     const data = await addSong(uri);
     responses.push(data);
+    await asyncPause();
   }
 
   return responses;
-}
-
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function asyncPause() {
-  await delay(2000); // Pause for 10 seconds asynchronously
 }
 
 function formatDate(inputDate) {
@@ -245,10 +244,15 @@ async function fetchFollowedArtists(accessToken) {
         Authorization: `Bearer ${accessToken}`,
       },
     });
+    if (!response.ok) {
+      console.log("response", response);
+      throw new Error(response.statusText);
+    }
     const data = await response.json();
-    console.log("data", data);
+    // console.log("data", data);
     followedArtists = [...followedArtists, ...data.artists.items];
     if (data.artists.next) {
+      await asyncPause();
       await fetchFollowedArtistsInner(data.artists.next);
     } else {
       fetchMore = false;
@@ -262,7 +266,6 @@ async function fetchFollowedArtists(accessToken) {
       console.log(error);
       fetchMore = false;
     }
-    await delay(50);
   } while (fetchMore);
 
   return followedArtists;
@@ -286,6 +289,7 @@ async function fetchRecentArtistReleases(accessToken, id) {
     // console.log("data", data);
     artistReleases = [...artistReleases, ...data.items];
     if (data.next) {
+      await asyncPause();
       await fetchRecentArtistReleasesInner(accessToken, id, data.next);
     } else {
       fetchMore = false;
@@ -299,7 +303,6 @@ async function fetchRecentArtistReleases(accessToken, id) {
       console.log(error);
       fetchMore = false;
     }
-    await delay(100);
   } while (fetchMore);
 
   // Get 7 days ago
@@ -311,26 +314,36 @@ async function fetchRecentArtistReleases(accessToken, id) {
   return recentReleases;
 }
 
+function logMessage(string = "", data = "") {
+  console.log(redBold(new Date().toLocaleTimeString("en-US", { hour12: true })), successBold(string), cyanBold(data));
+}
+
 async function getNewMusic(accessToken) {
+  logMessage("Getting new music!");
+
   /**
    * @type {Object.<string, string[]>}
    */
   const megaReleaseRadar = {
-    PLAYLIST_NAME: [],
+    [PLAYLIST_NAME]: [],
   };
   // Get followed artists
   let followedArtists = await fetchFollowedArtists(accessToken);
+  logMessage("Followed artists fetched! Followed artists: ", followedArtists.length);
 
   // Iterate over artists
   let allRecentReleases = [];
   for (const artist of followedArtists) {
+    logMessage("Fetching recent releases for: ", artist.name);
     const artistReleases = await fetchRecentArtistReleases(accessToken, artist.id);
+    logMessage("Recent releases: ", artistReleases.length);
     // console.log(`${artist.name} has ${artistReleases.length} releases`);
     // console.log(artistReleases.map((release) => release.release_date));
     allRecentReleases = [...allRecentReleases, ...artistReleases];
-    await delay(100);
+    await asyncPause();
   }
 
+  logMessage("Fetching recent release details: ", allRecentReleases.length);
   for (const recentRelease of allRecentReleases) {
     // Get album details
     const releaseDetails = await getAlbumDetails(accessToken, recentRelease.id);
@@ -343,16 +356,17 @@ async function getNewMusic(accessToken) {
       const albumName = createAlbumName(releaseDetails);
       megaReleaseRadar[albumName] = uris;
     }
-    await delay(100);
+    await asyncPause();
   }
 
+  logMessage("Creating playlists: ", Object.keys(megaReleaseRadar).length);
   // Create playlist for each album
   for (const [playlistName, trackUris] of Object.entries(megaReleaseRadar)) {
     await createPlaylist(accessToken, USER_ID, playlistName, trackUris);
     console.log(successBold(`${playlistName} created!`));
-    await delay(100);
+    await asyncPause();
   }
-
+  logMessage("Success", "!");
   return megaReleaseRadar;
 }
 
