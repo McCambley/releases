@@ -275,7 +275,7 @@ async function fetchRecentArtistReleases(accessToken, id) {
   let fetchMore = true;
 
   async function fetchRecentArtistReleasesInner(accessToken, id, url) {
-    const response = await fetch(url || `https://api.spotify.com/v1/artists/${id}/albums`, {
+    const response = await fetch(url || `https://api.spotify.com/v1/artists/${id}/albums?include_groups=album,single,appears_on`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
