@@ -276,7 +276,7 @@ async function fetchRecentArtistReleases(accessToken, id) {
   let fetchMore = true;
 
   async function fetchRecentArtistReleasesInner(accessToken, id, url) {
-    const response = await fetch(url || `https://api.spotify.com/v1/artists/${id}/albums?include_groups=album,single,appears_on`, {
+    const response = await fetch(url || `https://api.spotify.com/v1/artists/${id}/albums?include_groups=album,single,appears_on,compilation`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
@@ -348,14 +348,24 @@ async function getNewMusic(accessToken) {
   for (const recentRelease of allRecentReleases) {
     // Get album details
     const releaseDetails = await getAlbumDetails(accessToken, recentRelease.id);
-    const uris = releaseDetails.tracks.items.map((i) => i.uri);
-    // Check if the album has fewer than 4 tracks
-    if (releaseDetails.tracks.total < EP_MAXIMUM) {
-      // Add all tracks to the Mega Release Radar
-      megaReleaseRadar[PLAYLIST_NAME] = [...megaReleaseRadar[PLAYLIST_NAME], ...uris];
+    // Check if the artist is Various Artists
+    const artistIsVariousArtists = releaseDetails.artists
+      .map((a) => a.name)
+      .join("")
+      .toLowerCase()
+      .includes("various artists");
+    if (!artistIsVariousArtists) {
+      const uris = releaseDetails.tracks.items.map((i) => i.uri);
+      // Check if the album has fewer than 4 tracks
+      if (releaseDetails.tracks.total < EP_MAXIMUM) {
+        // Add all tracks to the Mega Release Radar
+        megaReleaseRadar[PLAYLIST_NAME] = [...megaReleaseRadar[PLAYLIST_NAME], ...uris];
+      } else {
+        const albumName = createAlbumName(releaseDetails);
+        megaReleaseRadar[albumName] = uris;
+      }
     } else {
-      const albumName = createAlbumName(releaseDetails);
-      megaReleaseRadar[albumName] = uris;
+      logMessage("Skipping Various Artists album", `${releaseDetails.tracks.total}`);
     }
     await asyncPause();
   }
