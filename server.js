@@ -4,14 +4,14 @@ const querystring = require("querystring");
 
 require("dotenv").config();
 
-const { automatePlaylistCreation, fetchFollowedArtists, getNewMusic } = require("./index");
+const { automatePlaylistCreation, fetchFollowedArtists, getNewMusic, getSavedSongs } = require("./index");
 
 const app = express();
 
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const REDIRECT_URI = process.env.REDIRECT_URI;
-const scopes = ["playlist-modify-public", "playlist-modify-private", "user-follow-read"];
+const scopes = ["playlist-modify-public", "playlist-modify-private", "user-follow-read", "user-library-read"];
 
 async function getAccessTokenFromRefreshToken(clientId, clientSecret, refreshToken) {
   const data = {
@@ -64,7 +64,7 @@ app.get("/callback", async (req, res) => {
     // Store the refresh token securely for future use.
     // This refresh token can be used to obtain access tokens without the need for user interaction.
 
-    res.send(responseV2);
+    res.send({ response, responseV2 });
   } catch (error) {
     console.error(error);
     // res.redirect("/login");
