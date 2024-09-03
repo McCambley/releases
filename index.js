@@ -380,5 +380,44 @@ async function getNewMusic(accessToken) {
   logMessage("Success", "!");
   return megaReleaseRadar;
 }
+async function getSavedSongs(accessToken) {
+  let savedSongs = [];
+  let fetchMore = true;
+  async function getSavedSongsInner(accessToken, url) {
+    const response = await fetch(url || "https://api.spotify.com/v1/me/tracks?limit=50", {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
 
-module.exports = { automatePlaylistCreation, fetchFollowedArtists, fetchArtistReleases: fetchRecentArtistReleases, getNewMusic };
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("Error response:", errorData);
+      throw new Error(response.statusText);
+    }
+
+    const data = await response.json();
+    savedSongs = [...savedSongs, ...data.items];
+    if (data.next) {
+      console.log(data.next);
+      await asyncPause(500);
+      await getSavedSongsInner(accessToken, data.next);
+    } else {
+      fetchMore = false;
+    }
+    return data;
+  }
+
+  do {
+    try {
+      await getSavedSongsInner(accessToken);
+    } catch (error) {
+      console.log(error);
+      fetchMore = false;
+    }
+  } while (fetchMore);
+  const artistsInSavedSongs = savedSongs.map((song) => song.track.artists.map((artist) => artist.name)).flat();
+  return [...new Set(artistsInSavedSongs)].sort();
+}
+
+module.exports = { automatePlaylistCreation, fetchFollowedArtists, fetchArtistReleases: fetchRecentArtistReleases, getNewMusic, getSavedSongs };
