@@ -180,7 +180,8 @@ async function automatePlaylistCreation(accessToken) {
     if (!accessToken) {
       throw new Error("No token found");
     }
-    const tracks = await getReleaseRadarTracks(accessToken);
+    const allReleaseRadarTracks = await getReleaseRadarTracks(accessToken);
+    const tracks = allReleaseRadarTracks.filter((track) => !!track);
     const playlistsToCreate = [];
     const releaseRadarTrackUris = tracks.map((track) => track.uri);
     let releaseRadarTrimmedTrackUris = [];
