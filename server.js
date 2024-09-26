@@ -38,6 +38,26 @@ async function getAccessTokenFromRefreshToken(clientId, clientSecret, refreshTok
   }
 }
 
+app.get("/", (req, res) => {
+  res.send(`
+    <html>
+      <head>
+        <title>Run Playlist Creator</title>
+      </head>
+      <body>
+        <h1>Create Playlists</h1>
+        <form action="/test-post" method="POST">
+          <button type="submit">Run</button>
+        </form>
+      </body>
+    </html>
+  `);
+});
+
+app.post("/test-post", (req, res) => {
+  res.send("Hello, World!");
+});
+
 app.get("/login", (req, res) => {
   const authorizeUrl =
     "https://accounts.spotify.com/authorize?" +
