@@ -185,6 +185,7 @@ async function automatePlaylistCreation(accessToken) {
     const playlistsToCreate = [];
     const releaseRadarTrackUris = tracks.map((track) => track.uri);
     let releaseRadarTrimmedTrackUris = [];
+    let allEPTrackUris = [];
 
     // Get 7 days ago
     const sevenDaysAgo = new Date();
@@ -194,13 +195,20 @@ async function automatePlaylistCreation(accessToken) {
       const albumDetails = await getAlbumDetails(accessToken, track.album.id);
       const releaseDate = new Date(albumDetails.release_date);
       const isRecent = releaseDate >= sevenDaysAgo;
+      const isAnAlbum = albumDetails.total_tracks > TRACK_MINIMUM;
+      const isAnEP = albumDetails.total_tracks <= TRACK_MINIMUM && albumDetails.total_tracks > 1;
 
-      if (albumDetails.total_tracks > TRACK_MINIMUM && isRecent) {
+      if (isAnAlbum && isRecent) {
         const trackUris = albumDetails.tracks.items.map((item) => item.uri);
         const playlistName = createAlbumName(albumDetails);
         // console.log("Making: ", playlistName);
         console.log(successBold(`Song "${track.name}" made it's own playlist: `, playlistName));
         playlistsToCreate.push({ name: playlistName, trackUris });
+      } else if (isAnEP && isRecent) {
+        console.log("Found a recent EP with length: ", albumDetails.total_tracks);
+        // DISABLED FOR NOW -- DOING THIS FOR A TEST WEEK MAY 31, 2025
+        // const trackUris = albumDetails.tracks.items.map((item) => item.uri);
+        // allEPTrackUris = [...allEPTrackUris, ...trackUris];
       }
 
       if (isRecent) {
@@ -211,10 +219,14 @@ async function automatePlaylistCreation(accessToken) {
       }
     }
 
+    const deduplicatedTrimmedUris = deduplicateArrays(releaseRadarTrimmedTrackUris, allEPTrackUris);
+
+    console.log({ releaseRadarTrimmedTrackUris: releaseRadarTrimmedTrackUris.length, allEPTrackUris: allEPTrackUris.length, deduplicatedTrimmedUris: deduplicatedTrimmedUris.length });
+
     playlistsToCreate.sort();
     playlistsToCreate.push({
       name: "API Radar (Trimmed)",
-      trackUris: releaseRadarTrimmedTrackUris,
+      trackUris: deduplicatedTrimmedUris,
     });
 
     playlistsToCreate.push({
@@ -234,6 +246,17 @@ async function automatePlaylistCreation(accessToken) {
     console.error("Error:", error.message);
     throw error;
   }
+}
+
+/**
+ * Deduplicate two arrays of strings
+ * @param {string[]} array1 Array of strings
+ * @param {string[]} array2 Array of strings that may overlap with array1
+ * @returns {string[]}
+ */
+function deduplicateArrays(array1 = [], array2 = []) {
+  const newSet = new Set([...array1, ...array2]);
+  return Array.from(newSet);
 }
 
 async function fetchFollowedArtists(accessToken) {
