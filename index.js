@@ -58,6 +58,8 @@ async function getReleaseRadarTracks(accessToken) {
   let thirdData = {};
 
   // Fetch first 100 tracks
+  // Note: Algorithmic playlists can no longer be fetched: https://developer.spotify.com/blog/2024-11-27-changes-to-the-web-api
+  // Copy target playlist to a new playlist manually before running this script
   const first = await fetch(`https://api.spotify.com/v1/playlists/${RELEASE_RADAR_PLAYLIST_ID}/tracks?offset=0&limit=100`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -237,6 +239,7 @@ async function automatePlaylistCreation(accessToken) {
     // console.log(playlistsToCreate);
 
     for (const playlist of playlistsToCreate) {
+      console.log(successBold(`Creating playlist: ${playlist.name}...`));
       await createPlaylist(accessToken, USER_ID, playlist.name, playlist.trackUris);
       console.log(successBold(`${playlist.name} created!`));
     }
